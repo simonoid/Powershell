@@ -1,6 +1,27 @@
 #source: https://www.cyberdrain.com/monitoring-with-powershell-checking-if-your-device-is-compatible-with-windows-11/
 #$OSVersion = [System.Environment]::OSVersion.Version
 
+#Check for minimum Win10 1903 to run this script
+$Build = [System.Environment]::OSVersion.Version.build
+if ($Build -lt 18362) {
+    Write-Output -verbose "Windows Version Less than 1903 - Build $Build"
+    $Compatible = "OS mismatch (Less than Win10 1903)"
+    $TPMcompatible = $False
+    $ProcessorCompatible = $False
+    $OSCheck = $False
+    $Secureboot = $False
+    $TPMVersionResult = $False
+    $RAMMinimum = $False
+    $DiskCheck = $False
+    $DirectX12 = $False
+    exit
+}
+
+If ($build -ge 18362) {
+    Write-Output -verbose "Windows Version equal or greater than 1903 - Build $Build"
+}
+
+#Declare Processor models
 $Models = @"
 AMD,AMD,3015e
 AMD,AMD,3020e
@@ -731,12 +752,46 @@ else {
     $Secureboot = $true
 }
 
+#TPM Check
+$VersionInfo = "2.0%"
+$NameSpace = "root\CIMV2\Security\MicrosoftTPM"
+$TPMVersion = gwmi -Namespace $NameSpace -Class Win32_TPM
+
+#TPM Version Lookup
+$TPMVersionResult = if($TPMVersion.SpecVersion -like "*1.2*"){
+    Write-Output "1.2"
+} else {
+    Write-Output "2.0"
+}
+
+#RAM Check 4GB minimum
+$RAMMinimum = ((Get-CimInstance Win32_PhysicalMemory | Measure-Object -Property capacity -Sum).sum /1gb ) -ge 4
+
+#Disk Check 64GB Minimum 
+$DiskCheck = (Get-PhysicalDisk | Where-Object DeviceId -eq '0' | Select Size).Size/1Gb -ge '64'
+
+#DirectX 12 Check
+Start-Process dxdiag -ArgumentList "/dontskip /x $env:TEMP\dxdiagresults.xml"
+
+$diagfile = "$env:TEMP\dxdiagresults.xml"
+
+if (Test-Path -Path $diagfile -PathType Leaf ) {
+
+$VersionXML = (Select-Xml -Path $diagfile -XPath '/DxDiag/SystemInformation/DirectXVersion').Node.InnerXml
+}
+Remove-Item $diagfile
+$DirectX12 = $VersionXML.substring(8) -ge 12
+
 #Display Results
 $Results = [PSCustomObject]@{
-    "TPM Compatible"       = [bool](Get-Tpm).tpmpresent
-    "Processor Compatible" = [bool]$Proc
-    "64 Bit OS"            = [Environment]::Is64BitOperatingSystem
+    "TPM Compatible"        = [bool](Get-Tpm).tpmpresent
+    "TPM Spec Version"      = $TPMVersionResult
+    "Processor Compatible"  = [bool]$Proc
+    "64 Bit OS"             = [Environment]::Is64BitOperatingSystem
+    "Minimum 4GB RAM"       = $RAMMinimum
+    "Minimum 64GB Drive"      = $DiskCheck
     "Secureboot is enabled" = $Secureboot
+    "DirectX 12 Compatible" = $DirectX12
 } 
  
 if ($results.psobject.properties.value -contains $false) {
@@ -754,4 +809,12 @@ else {
 $TPMcompatible = [bool](Get-Tpm).tpmpresent
 $ProcessorCompatible = [bool]$Proc
 $OSCheck = [Environment]::Is64BitOperatingSystem
-#$Secureboot
+<#
+$Secureboot
+$TPMVersionResult
+$RAMMinimum
+$DiskCheck
+$DirectX12
+System Compatible for Upgrade? = $Compatible
+#>
+
