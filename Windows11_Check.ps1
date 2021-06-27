@@ -747,8 +747,9 @@ if (!$reg)
 Write-Host "Secure Boot not enabled"
 $Secureboot = $false
 }
-else {
-    Write-Host "Secure Boot is enabled" -f green
+
+if ($reg){
+    #Write-Host "Secure Boot is enabled" -f green
     $Secureboot = $true
 }
 
@@ -760,7 +761,8 @@ $TPMVersion = gwmi -Namespace $NameSpace -Class Win32_TPM
 #TPM Version Lookup
 $TPMVersionResult = if($TPMVersion.SpecVersion -like "*1.2*"){
     Write-Output "1.2"
-} else {
+} 
+$TPMVersionResult = if($TPMVersion.SpecVersion -like "*2.0*"){
     Write-Output "2.0"
 }
 
@@ -779,8 +781,8 @@ if (Test-Path -Path $diagfile -PathType Leaf ) {
 
 $VersionXML = (Select-Xml -Path $diagfile -XPath '/DxDiag/SystemInformation/DirectXVersion').Node.InnerXml
 }
-Remove-Item $diagfile
-$DirectX12 = $VersionXML.substring(8) -ge 12
+#Remove-Item $diagfile
+$DirectX12 = $VersionXML -match 12
 
 #Display Results
 $Results = [PSCustomObject]@{
@@ -795,12 +797,13 @@ $Results = [PSCustomObject]@{
 } 
  
 if ($results.psobject.properties.value -contains $false) {
-    write-host "This device is not compatible with Windows 11. See the detailed results for more information"
+    write-host "This device is not compatible with Windows 11. See the detailed results for more information" -f Red
     $Results | Format-List
     $Compatible = $false
 }
-else {
-    write-host "This device is compatible with Windows 11. See the detailed results for more information"
+
+if ($results.psobject.properties.value -contains $true) {
+    write-host "This device is compatible with Windows 11. See the detailed results for more information" -f Green
     $Results | format-list
     $Compatible = $true
 }
