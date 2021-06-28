@@ -781,7 +781,7 @@ if (Test-Path -Path $diagfile -PathType Leaf ) {
 
 $VersionXML = (Select-Xml -Path $diagfile -XPath '/DxDiag/SystemInformation/DirectXVersion').Node.InnerXml
 }
-#Remove-Item $diagfile
+Remove-Item $diagfile
 $DirectX12 = $VersionXML -match 12
 
 #Display Results
